@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Truyện — Viết & Lưu</title>
+<style>
+  :root{--bg:#f7f3ec;--paper:#fffdf8;--ink:#2b2620;--muted:#8a7f6d;--line:#e5dcc9;--accent:#9a3b26;--accent2:#f3e9d7}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,'Times New Roman',serif}
+  header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px;z-index:5}
+  .wrap{max-width:860px;margin:0 auto;padding:0 16px 60px}
+  h1{font-size:24px;margin:0;cursor:pointer}
+  .sub{color:var(--muted);font-size:14px;margin-top:4px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+  input[type=text],input[type=search],textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:16px}
+  textarea{min-height:55vh;line-height:1.8;resize:vertical}
+  button{padding:10px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:15px;cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{color:#b3261e}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;margin:10px 0;cursor:pointer}
+  .card:hover{border-color:var(--accent)}
+  .card h3{margin:0 0 6px;font-size:19px}
+  .meta{color:var(--muted);font-size:13px}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:14px;margin:10px 0}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1}
+  .hidden{display:none}
+  #saveStatus{color:var(--muted);font-size:13px}
+  .empty{text-align:center;color:var(--muted);padding:40px 0}
+</style>
+</head>
+<body>
+<header><div class="wrap" style="padding-bottom:0">
+  <h1 id="homeBtn">📖 Web Truyện</h1>
+  <div class="sub" id="crumb">Viết truyện — mỗi truyện có nhiều chương, tự lưu trên máy này</div>
+</div></header>
+
+<div class="wrap">
+  <!-- HOME: danh sách truyện -->
+  <section id="viewHome">
+    <div class="stats" id="homeStats"></div>
+    <div class="bar">
+      <input type="search" id="searchStory" class="grow" placeholder="Tìm truyện...">
+      <button class="primary" id="btnNewStory">+ Truyện mới</button>
+      <button id="btnExportAll">Xuất bản sao</button>
+      <button id="btnImport">Nhập bản sao</button>
+      <input type="file" id="fileImport" accept=".json" class="hidden">
+    </div>
+    <div id="storyList"></div>
+  </section>
+
+  <!-- STORY: danh sách chương -->
+  <section id="viewStory" class="hidden">
+    <div class="bar"><button id="btnBackHome">← Tất cả truyện</button></div>
+    <h2 id="storyTitle" style="margin:6px 0"></h2>
+    <div class="stats" id="storyStats"></div>
+    <div class="bar">
+      <input type="search" id="searchChapter" class="grow" placeholder="Tìm chương theo tiêu đề / nội dung...">
+      <button class="primary" id="btnNewChapter">+ Chương mới</button>
+      <button id="btnExportStory">Tải truyện (.txt)</button>
+      <button id="btnRenameStory">Đổi tên truyện</button>
+      <button class="danger" id="btnDeleteStory">Xóa truyện</button>
+    </div>
+    <div id="chapterList"></div>
+  </section>
+
+  <!-- EDITOR: viết chương -->
+  <section id="viewEdit" class="hidden">
+    <div class="bar">
+      <button id="btnBackStory">← Danh sách chương</button>
+      <span id="saveStatus" class="grow"></span>
+      <button id="btnDownloadChapter">Tải chương (.txt)</button>
+      <button class="danger" id="btnDeleteChapter">Xóa chương</button>
+    </div>
+    <input type="text" id="chapterTitle" placeholder="Tiêu đề chương, ví dụ: Chương 1 — Vạn Thọ Yến">
+    <div class="stats" id="editStats"></div>
+    <textarea id="chapterBody" placeholder="Viết ở đây... gõ đến đâu tự lưu đến đó."></textarea>
+  </section>
+</div>
+
+<script>
+const KEY = 'web-truyen-v1';
+let data = load();
+let curStory = null, curChapter = null, saveTimer = null;
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function words(t){ t=(t||'').trim(); return t ? t.split(/\s+/).length : 0; }
+function esc(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts){ return new Date(ts).toLocaleString('vi-VN'); }
+function storyWords(s){ return s.chapters.reduce((a,c)=>a+words(c.content),0); }
+function show(id){ ['viewHome','viewStory','viewEdit'].forEach(v=>document.getElementById(v).classList.toggle('hidden', v!==id)); }
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  show('viewHome');
+  document.getElementById('crumb').textContent = 'Viết truyện — mỗi truyện có nhiều chương, tự lưu trên máy này';
+  const q = document.getElementById('searchStory').value.trim().toLowerCase();
+  const totalW = data.reduce((a,s)=>a+storyWords(s),0);
+  const totalC = data.reduce((a,s)=>a+s.chapters.length,0);
+  document.getElementById('homeStats').innerHTML =
+    `<span><b>${data.length}</b> truyện</span><span><b>${totalC}</b> chương</span><span><b>${totalW.toLocaleString('vi-VN')}</b> chữ</span>`;
+  const list = data.filter(s=>!q || s.title.toLowerCase().includes(q))
+    .sort((a,b)=>b.updated-a.updated);
+  document.getElementById('storyList').innerHTML = list.length ? list.map(s=>
+    `<div class="card" onclick="openStory('${s.id}')">
+       <h3>${esc(s.title)}</h3>
+       <div class="meta">${s.chapters.length} chương · ${storyWords(s).toLocaleString('vi-VN')} chữ · sửa ${fmtDate(s.updated)}</div>
+     </div>`).join('')
+    : `<div class="empty">Chưa có truyện nào khớp. Bấm “+ Truyện mới” để bắt đầu.</div>`;
+}
+document.getElementById('searchStory').addEventListener('input', renderHome);
+document.getElementById('btnNewStory').onclick = () => {
+  const title = prompt('Tên truyện mới:'); if(!title || !title.trim()) return;
+  const s = {id:uid(), title:title.trim(), created:Date.now(), updated:Date.now(), chapters:[]};
+  data.push(s); save(); openStory(s.id);
+};
+document.getElementById('homeBtn').onclick = renderHome;
+document.getElementById('btnExportAll').onclick = () => download('web-truyen-backup.json', JSON.stringify(data,null,2), 'application/json');
+document.getElementById('btnImport').onclick = () => document.getElementById('fileImport').click();
+document.getElementById('fileImport').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  f.text().then(t => { try{ const d = JSON.parse(t); if(!Array.isArray(d)) throw 0;
+    if(confirm('Nhập bản sao sẽ THAY toàn bộ dữ liệu hiện tại. Tiếp tục?')){ data = d; save(); renderHome(); }
+  }catch(_){ alert('File không hợp lệ.'); } });
+});
+
+/* ---------- STORY ---------- */
+function openStory(id){
+  curStory = data.find(s=>s.id===id); if(!curStory) return renderHome();
+  show('viewStory');
+  document.getElementById('crumb').textContent = 'Truyện: ' + curStory.title;
+  document.getElementById('storyTitle').textContent = curStory.title;
+  renderChapters();
+}
+function renderChapters(){
+  const q = document.getElementById('searchChapter').value.trim().toLowerCase();
+  document.getElementById('storyStats').innerHTML =
+    `<span><b>${curStory.chapters.length}</b> chương</span><span><b>${storyWords(curStory).toLocaleString('vi-VN')}</b> chữ</span>`;
+  const list = curStory.chapters.map((c,i)=>({c,i}))
+    .filter(({c})=>!q || c.title.toLowerCase().includes(q) || (c.content||'').toLowerCase().includes(q));
+  document.getElementById('chapterList').innerHTML = list.length ? list.map(({c,i})=>
+    `<div class="card" onclick="openChapter('${c.id}')">
+       <h3>${esc(c.title) || 'Chương ' + (i+1)}</h3>
+       <div class="meta">${words(c.content).toLocaleString('vi-VN')} chữ · sửa ${fmtDate(c.updated)}</div>
+     </div>`).join('')
+    : `<div class="empty">Chưa có chương nào. Bấm “+ Chương mới” để viết chương đầu tiên.</div>`;
+}
+document.getElementById('searchChapter').addEventListener('input', renderChapters);
+document.getElementById('btnBackHome').onclick = renderHome;
+document.getElementById('btnNewChapter').onclick = () => {
+  const n = curStory.chapters.length + 1;
+  const c = {id:uid(), title:'Chương ' + n, content:'', updated:Date.now()};
+  curStory.chapters.push(c); curStory.updated = Date.now(); save(); openChapter(c.id);
+};
+document.getElementById('btnRenameStory').onclick = () => {
+  const t = prompt('Tên truyện:', curStory.title); if(!t || !t.trim()) return;
+  curStory.title = t.trim(); curStory.updated = Date.now(); save(); openStory(curStory.id);
+};
+document.getElementById('btnDeleteStory').onclick = () => {
+  if(!confirm('Xóa hẳn truyện “' + curStory.title + '” và mọi chương trong đó?')) return;
+  data = data.filter(s=>s.id!==curStory.id); curStory = null; save(); renderHome();
+};
+document.getElementById('btnExportStory').onclick = () => {
+  const txt = curStory.title + '\n\n' + curStory.chapters.map(c=>c.title + '\n\n' + (c.content||'')).join('\n\n---\n\n');
+  download(curStory.title + '.txt', txt, 'text/plain');
+};
+
+/* ---------- EDITOR ---------- */
+function openChapter(id){
+  curChapter = curStory.chapters.find(c=>c.id===id); if(!curChapter) return;
+  show('viewEdit');
+  document.getElementById('crumb').textContent = curStory.title + ' › ' + (curChapter.title || 'Chương');
+  document.getElementById('chapterTitle').value = curChapter.title || '';
+  document.getElementById('chapterBody').value = curChapter.content || '';
+  document.getElementById('saveStatus').textContent = 'Đã lưu · ' + fmtDate(curChapter.updated);
+  renderEditStats();
+}
+function renderEditStats(){
+  const t = document.getElementById('chapterBody').value;
+  const w = words(t);
+  document.getElementById('editStats').innerHTML =
+    `<span><b>${w.toLocaleString('vi-VN')}</b> chữ</span><span><b>${t.length.toLocaleString('vi-VN')}</b> ký tự</span><span>đọc khoảng <b>${Math.max(1, Math.ceil(w/200))}</b> phút</span>`;
+}
+function queueSave(){
+  document.getElementById('saveStatus').textContent = 'Đang lưu...';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    curChapter.title = document.getElementById('chapterTitle').value;
+    curChapter.content = document.getElementById('chapterBody').value;
+    curChapter.updated = Date.now(); curStory.updated = Date.now(); save();
+    document.getElementById('saveStatus').textContent = 'Đã lưu · ' + fmtDate(curChapter.updated);
+    renderEditStats();
+  }, 400);
+}
+document.getElementById('chapterTitle').addEventListener('input', queueSave);
+document.getElementById('chapterBody').addEventListener('input', () => { queueSave(); renderEditStats(); });
+document.getElementById('btnBackStory').onclick = () => { clearTimeout(saveTimer);
+  curChapter.title = document.getElementById('chapterTitle').value;
+  curChapter.content = document.getElementById('chapterBody').value;
+  curChapter.updated = Date.now(); curStory.updated = Date.now(); save(); openStory(curStory.id); };
+document.getElementById('btnDownloadChapter').onclick = () =>
+  download((curChapter.title || 'chuong') + '.txt', (curChapter.title||'') + '\n\n' + document.getElementById('chapterBody').value, 'text/plain');
+document.getElementById('btnDeleteChapter').onclick = () => {
+  if(!confirm('Xóa hẳn chương này?')) return;
+  curStory.chapters = curStory.chapters.filter(c=>c.id!==curChapter.id);
+  curStory.updated = Date.now(); save(); openStory(curStory.id);
+};
+
+function download(name, content, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type:type + ';charset=utf-8'}));
+  a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+window.openStory = openStory; window.openChapter = openChapter;
+renderHome();
+</script>
+</body>
+</html>
