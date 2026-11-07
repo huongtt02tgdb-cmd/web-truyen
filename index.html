@@ -53,13 +53,12 @@
   <!-- STORY: danh sách chương -->
   <section id="viewStory" class="hidden">
     <div class="bar"><button id="btnBackHome">← Tất cả truyện</button></div>
-    <h2 id="storyTitle" style="margin:6px 0"></h2>
+    <input type="text" id="storyTitleInput" placeholder="Tên truyện (để trống cũng được, điền sau)" style="font-size:20px;font-weight:bold;margin:6px 0">
     <div class="stats" id="storyStats"></div>
     <div class="bar">
       <input type="search" id="searchChapter" class="grow" placeholder="Tìm chương theo tiêu đề / nội dung...">
       <button class="primary" id="btnNewChapter">+ Chương mới</button>
       <button id="btnExportStory">Tải truyện (.txt)</button>
-      <button id="btnRenameStory">Đổi tên truyện</button>
       <button class="danger" id="btnDeleteStory">Xóa truyện</button>
     </div>
     <div id="chapterList"></div>
@@ -91,6 +90,7 @@ function words(t){ t=(t||'').trim(); return t ? t.split(/\s+/).length : 0; }
 function esc(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(ts){ return new Date(ts).toLocaleString('vi-VN'); }
 function storyWords(s){ return s.chapters.reduce((a,c)=>a+words(c.content),0); }
+function sTitle(s){ return (s.title && s.title.trim()) ? s.title : 'Truyện chưa đặt tên'; }
 function show(id){ ['viewHome','viewStory','viewEdit'].forEach(v=>document.getElementById(v).classList.toggle('hidden', v!==id)); }
 
 /* ---------- HOME ---------- */
@@ -102,20 +102,21 @@ function renderHome(){
   const totalC = data.reduce((a,s)=>a+s.chapters.length,0);
   document.getElementById('homeStats').innerHTML =
     `<span><b>${data.length}</b> truyện</span><span><b>${totalC}</b> chương</span><span><b>${totalW.toLocaleString('vi-VN')}</b> chữ</span>`;
-  const list = data.filter(s=>!q || s.title.toLowerCase().includes(q))
+  const list = data.filter(s=>!q || (s.title||'').toLowerCase().includes(q))
     .sort((a,b)=>b.updated-a.updated);
   document.getElementById('storyList').innerHTML = list.length ? list.map(s=>
     `<div class="card" onclick="openStory('${s.id}')">
-       <h3>${esc(s.title)}</h3>
+       <h3>${esc(sTitle(s))}</h3>
        <div class="meta">${s.chapters.length} chương · ${storyWords(s).toLocaleString('vi-VN')} chữ · sửa ${fmtDate(s.updated)}</div>
      </div>`).join('')
     : `<div class="empty">Chưa có truyện nào khớp. Bấm “+ Truyện mới” để bắt đầu.</div>`;
 }
 document.getElementById('searchStory').addEventListener('input', renderHome);
 document.getElementById('btnNewStory').onclick = () => {
-  const title = prompt('Tên truyện mới:'); if(!title || !title.trim()) return;
-  const s = {id:uid(), title:title.trim(), created:Date.now(), updated:Date.now(), chapters:[]};
-  data.push(s); save(); openStory(s.id);
+  // Không bắt điền gì hết: tạo truyện trống + Chương 1 rồi mở thẳng ô viết.
+  const c = {id:uid(), title:'Chương 1', content:'', updated:Date.now()};
+  const s = {id:uid(), title:'', created:Date.now(), updated:Date.now(), chapters:[c]};
+  data.push(s); save(); curStory = s; openChapter(c.id);
 };
 document.getElementById('homeBtn').onclick = renderHome;
 document.getElementById('btnExportAll').onclick = () => download('web-truyen-backup.json', JSON.stringify(data,null,2), 'application/json');
@@ -131,8 +132,8 @@ document.getElementById('fileImport').addEventListener('change', e => {
 function openStory(id){
   curStory = data.find(s=>s.id===id); if(!curStory) return renderHome();
   show('viewStory');
-  document.getElementById('crumb').textContent = 'Truyện: ' + curStory.title;
-  document.getElementById('storyTitle').textContent = curStory.title;
+  document.getElementById('crumb').textContent = 'Truyện: ' + sTitle(curStory);
+  document.getElementById('storyTitleInput').value = curStory.title || '';
   renderChapters();
 }
 function renderChapters(){
@@ -155,24 +156,24 @@ document.getElementById('btnNewChapter').onclick = () => {
   const c = {id:uid(), title:'Chương ' + n, content:'', updated:Date.now()};
   curStory.chapters.push(c); curStory.updated = Date.now(); save(); openChapter(c.id);
 };
-document.getElementById('btnRenameStory').onclick = () => {
-  const t = prompt('Tên truyện:', curStory.title); if(!t || !t.trim()) return;
-  curStory.title = t.trim(); curStory.updated = Date.now(); save(); openStory(curStory.id);
-};
+document.getElementById('storyTitleInput').addEventListener('input', e => {
+  curStory.title = e.target.value; curStory.updated = Date.now(); save();
+  document.getElementById('crumb').textContent = 'Truyện: ' + sTitle(curStory);
+});
 document.getElementById('btnDeleteStory').onclick = () => {
-  if(!confirm('Xóa hẳn truyện “' + curStory.title + '” và mọi chương trong đó?')) return;
+  if(!confirm('Xóa hẳn truyện “' + sTitle(curStory) + '” và mọi chương trong đó?')) return;
   data = data.filter(s=>s.id!==curStory.id); curStory = null; save(); renderHome();
 };
 document.getElementById('btnExportStory').onclick = () => {
-  const txt = curStory.title + '\n\n' + curStory.chapters.map(c=>c.title + '\n\n' + (c.content||'')).join('\n\n---\n\n');
-  download(curStory.title + '.txt', txt, 'text/plain');
+  const txt = sTitle(curStory) + '\n\n' + curStory.chapters.map(c=>c.title + '\n\n' + (c.content||'')).join('\n\n---\n\n');
+  download(sTitle(curStory) + '.txt', txt, 'text/plain');
 };
 
 /* ---------- EDITOR ---------- */
 function openChapter(id){
   curChapter = curStory.chapters.find(c=>c.id===id); if(!curChapter) return;
   show('viewEdit');
-  document.getElementById('crumb').textContent = curStory.title + ' › ' + (curChapter.title || 'Chương');
+  document.getElementById('crumb').textContent = sTitle(curStory) + ' › ' + (curChapter.title || 'Chương');
   document.getElementById('chapterTitle').value = curChapter.title || '';
   document.getElementById('chapterBody').value = curChapter.content || '';
   document.getElementById('saveStatus').textContent = 'Đã lưu · ' + fmtDate(curChapter.updated);
