@@ -12,8 +12,18 @@ trang chính là danh sách truyện → vào từng truyện là danh sách ch�
 - **Xuất / Nhập bản sao** (file `.json`) để chuyển máy hoặc sao lưu
 
 ## Cách chạy
-- Mở thẳng file `index.html`, hoặc bật GitHub Pages cho repo này
-  (Settings → Pages → Branch: `main` / root) rồi vào địa chỉ `https://<tên-github>.github.io/web-truyen/`
+- Mở thẳng file `index.html` trên máy, hoặc dùng bản online có mật khẩu như kotoba (mục dưới).
+
+## Bản online riêng tư — Cloudflare Worker + cổng mật khẩu (giống kotoba)
+- Repo để **Private**. Mỗi lần push `index.html` / `site-worker/**` lên `main`,
+  GitHub Actions (`.github/workflows/deploy.yml`) tự deploy lên Worker **truyen-site**:
+  địa chỉ `https://truyen-site.myanl-kotoba.workers.dev`
+- Chưa đăng nhập thì chỉ thấy trang **"Web Truyện — Đăng nhập"**; mật khẩu nằm ở secret
+  `SITE_PASSWORD`, cookie đăng nhập 30 ngày (HttpOnly). `run_worker_first = ["/*"]` là bắt buộc
+  để file tĩnh không bypass cổng mật khẩu.
+- Repo cần 3 secrets (Settings → Secrets and variables → Actions), dùng lại đúng bộ của kotoba:
+  `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SITE_PASSWORD` (mật khẩu tự đặt cho web này).
+  Thêm secrets xong thì chạy lại workflow (Actions → deploy → Run workflow) nếu lượt chạy trước bị lỗi thiếu secrets.
 
 ## Lưu trữ — đọc kỹ
 Dữ liệu lưu trong **trình duyệt của từng máy** (localStorage), không đồng bộ giữa các máy
