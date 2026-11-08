@@ -21,6 +21,15 @@ trang chính là danh sách truyện → vào từng truyện là danh sách ch�
   KHÔNG nằm trên GitHub** — chữ lưu trong trình duyệt của từng máy (xem mục Lưu trữ), người khác
   mở link chỉ thấy trang trắng của họ, không thấy truyện của bạn.
 
+## Xem ở mọi máy — dữ liệu đẩy lên GitHub (`data.json`)
+- Nếu repo có file `data.json` (chính là file “Xuất bản sao” được đẩy lên), web tự nạp file đó
+  khi mở ở **bất kỳ máy/trình duyệt nào** và gộp với dữ liệu sẵn có của máy theo id
+  (truyện/chương thiếu thì thêm, trùng thì giữ bản sửa mới hơn — không mất bài).
+- Cách cập nhật bản xem chung: trong web bấm **Xuất bản sao** → gửi file cho Pax → Pax đẩy lên
+  repo thành `data.json`. Đây là **bản chụp tại thời điểm xuất**, không phải đồng bộ trực tiếp:
+  viết thêm ở máy chính thì phải xuất + đẩy lại, máy khác mới thấy phần mới.
+- Repo đang Public: `data.json` đẩy lên là **công khai, ai có link cũng đọc được** (user đã chốt hướng này 2026-11-08).
+
 ## Lưu trữ — đọc kỹ
 Dữ liệu lưu trong **trình duyệt của từng máy** (localStorage), không đồng bộ giữa các máy
 và sẽ mất nếu xóa dữ liệu trình duyệt. Hãy bấm **“Xuất bản sao”** thường xuyên để giữ file `.json`,
