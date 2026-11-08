@@ -226,7 +226,42 @@ function download(name, content, type){
   a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
 }
 window.openStory = openStory; window.openChapter = openChapter;
+
+/* ---------- Nạp dữ liệu đã đẩy lên GitHub (data.json cùng thư mục) ----------
+   Mở web ở máy/trình duyệt nào cũng tự thấy dữ liệu này.
+   Gộp theo id, không ghi đè mất bài: truyện/chương nào máy chưa có thì thêm vào,
+   trùng nhau thì giữ bản sửa mới hơn (theo thời gian updated). */
+function mergeRemote(remote){
+  let changed = false;
+  remote.forEach(rs => {
+    if(!rs || !rs.id || !Array.isArray(rs.chapters)) return;
+    rs.title = nfc(rs.title||'');
+    rs.chapters.forEach(rc => { rc.title = nfc(rc.title||''); rc.content = nfc(rc.content||''); });
+    const ls = data.find(s=>s.id===rs.id);
+    if(!ls){ data.push(rs); changed = true; return; }
+    if((rs.updated||0) > (ls.updated||0) && rs.title !== ls.title){ ls.title = rs.title; changed = true; }
+    rs.chapters.forEach(rc => {
+      if(!rc || !rc.id) return;
+      const lc = ls.chapters.find(c=>c.id===rc.id);
+      if(!lc){ ls.chapters.push(rc); changed = true; }
+      else if((rc.updated||0) > (lc.updated||0) && (rc.content !== lc.content || rc.title !== lc.title)){
+        lc.title = rc.title; lc.content = rc.content; lc.updated = rc.updated; changed = true;
+      }
+    });
+    if((rs.updated||0) > (ls.updated||0)){ ls.updated = rs.updated; }
+  });
+  return changed;
+}
+async function syncFromRepo(){
+  try{
+    const r = await fetch('data.json?t=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const remote = await r.json();
+    if(Array.isArray(remote) && mergeRemote(remote)){ save(); renderHome(); }
+  }catch(e){ /* chưa có data.json hoặc mất mạng: dùng dữ liệu máy như cũ */ }
+}
 renderHome();
+syncFromRepo();
 </script>
 </body>
 </html>
