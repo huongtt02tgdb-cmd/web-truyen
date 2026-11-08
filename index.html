@@ -98,6 +98,9 @@ function esc(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;
 function fmtDate(ts){ return new Date(ts).toLocaleString('vi-VN'); }
 function storyWords(s){ return s.chapters.reduce((a,c)=>a+words(c.content),0); }
 function sTitle(s){ return (s.title && s.title.trim()) ? s.title : 'Truyện chưa đặt tên'; }
+function chapNum(t){ const m = (t||'').match(/\d+/); return m ? parseInt(m[0],10) : Number.MAX_SAFE_INTEGER; }
+function sortedChapters(s){ return s.chapters.map((c,i)=>({c,i}))
+  .sort((a,b)=> (chapNum(a.c.title)-chapNum(b.c.title)) || (a.i-b.i)); }
 function show(id){ ['viewHome','viewStory','viewEdit'].forEach(v=>document.getElementById(v).classList.toggle('hidden', v!==id)); }
 
 /* ---------- HOME ---------- */
@@ -147,7 +150,7 @@ function renderChapters(){
   const q = document.getElementById('searchChapter').value.trim().toLowerCase();
   document.getElementById('storyStats').innerHTML =
     `<span><b>${curStory.chapters.length}</b> chương</span><span><b>${storyWords(curStory).toLocaleString('vi-VN')}</b> chữ</span>`;
-  const list = curStory.chapters.map((c,i)=>({c,i}))
+  const list = sortedChapters(curStory)
     .filter(({c})=>!q || c.title.toLowerCase().includes(q) || (c.content||'').toLowerCase().includes(q));
   document.getElementById('chapterList').innerHTML = list.length ? list.map(({c,i})=>
     `<div class="card" onclick="openChapter('${c.id}')">
@@ -172,7 +175,7 @@ document.getElementById('btnDeleteStory').onclick = () => {
   data = data.filter(s=>s.id!==curStory.id); curStory = null; save(); renderHome();
 };
 document.getElementById('btnExportStory').onclick = () => {
-  const txt = sTitle(curStory) + '\n\n' + curStory.chapters.map(c=>c.title + '\n\n' + (c.content||'')).join('\n\n---\n\n');
+  const txt = sTitle(curStory) + '\n\n' + sortedChapters(curStory).map(({c})=>c.title + '\n\n' + (c.content||'')).join('\n\n---\n\n');
   download(sTitle(curStory) + '.txt', txt, 'text/plain');
 };
 
